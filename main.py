@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException, Depends, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 from passlib.context import CryptContext
 import jwt
@@ -122,8 +123,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(a
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
-    user = db["user"].find_one({"_id": db.client.get_default_database().codec_options.uuid_representation if False else None})
-    # Fetch by _id string
     user = db["user"].find_one({"_id": user_id})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
@@ -135,7 +134,7 @@ async def apply_rate_limit(request: Request, call_next):
     try:
         await rate_limit(request)
     except HTTPException as e:
-        return fastapi.responses.JSONResponse(status_code=e.status_code, content={"detail": e.detail})
+        return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
     response = await call_next(request)
     return response
 
