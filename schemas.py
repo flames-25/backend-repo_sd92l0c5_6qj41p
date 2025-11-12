@@ -1,48 +1,67 @@
 """
-Database Schemas
+Application Database Schemas
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
+Each Pydantic model below maps to a MongoDB collection whose name is the lowercase class name.
+- User -> "user"
+- Project -> "project"
+- Task -> "task"
+- Subtask -> "subtask"
+- Session -> "session" (time tracking sessions)
 
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+These schemas are used for validation at API boundaries. Additional computed fields
+(like _id, timestamps) are injected by database helpers.
 """
+from typing import Optional, List, Literal
+from pydantic import BaseModel, Field, EmailStr
+from datetime import datetime
 
-from pydantic import BaseModel, Field
-from typing import Optional
-
-# Example schemas (replace with your own):
 
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
     name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    email: EmailStr = Field(..., description="Email address")
+    password_hash: str = Field(..., description="BCrypt hashed password")
+    theme: Literal["light", "dark"] = Field("light", description="Preferred theme")
+    telemetry_opt_in: bool = Field(False, description="User opted-in to telemetry")
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Project(BaseModel):
+    owner_id: str = Field(..., description="User _id string")
+    name: str = Field(..., description="Project name")
+    description: Optional[str] = Field(None, description="Project description")
+    color: Optional[str] = Field(None, description="Hex color for UI")
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+
+Priority = Literal["low", "medium", "high", "urgent"]
+
+
+class Task(BaseModel):
+    project_id: str = Field(..., description="Project _id string")
+    owner_id: str = Field(..., description="User _id string")
+    title: str = Field(...)
+    description: Optional[str] = None
+    priority: Priority = Field("medium")
+    due_date: Optional[datetime] = Field(None)
+    estimated_minutes: Optional[int] = Field(None, ge=0)
+    scheduled_date: Optional[datetime] = Field(None)
+    completed: bool = Field(False)
+
+
+class Subtask(BaseModel):
+    task_id: str = Field(..., description="Task _id string")
+    owner_id: str = Field(..., description="User _id string")
+    title: str
+    order: int = Field(0, ge=0)
+    completed: bool = Field(False)
+
+
+class Session(BaseModel):
+    owner_id: str = Field(..., description="User _id string")
+    task_id: Optional[str] = Field(None, description="Optional task _id if focused on a task")
+    mode: Literal["pomodoro", "stopwatch"] = Field("pomodoro")
+    started_at: datetime = Field(...)
+    ended_at: Optional[datetime] = Field(None)
+    duration_seconds: Optional[int] = Field(None, ge=0)
+    note: Optional[str] = Field(None)
+    pomodoro_length: Optional[int] = Field(None, description="minutes")
+    short_break: Optional[int] = Field(None, description="minutes")
+    long_break: Optional[int] = Field(None, description="minutes")
